@@ -22,6 +22,7 @@ const Dashboard = () => {
         title: "Authentication required",
         description: "Please sign in to view your dashboard",
       });
+      navigate('/sign-in');
       return;
     }
     
