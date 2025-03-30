@@ -74,11 +74,9 @@ UserSchema.methods.matchPassword = async function(enteredPassword) {
 
 // Generate JWT token
 UserSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign(
-    { id: this._id, role: this.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
-  );
+  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE
+  });
 };
 
 // Generate reset password token

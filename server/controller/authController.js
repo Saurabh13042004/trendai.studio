@@ -23,7 +23,8 @@ exports.registerUser = async (req, res) => {
     const newUser = new User({ name, email, password: hashedPassword });
     await newUser.save();
 
-    const token = 0;
+    // Generate JWT token
+    const token = newUser.getSignedJwtToken();
 
     res.status(201).json({
       message: 'User registered successfully',

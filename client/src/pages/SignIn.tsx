@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, UserIcon, KeyIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Footer from '@/components/Footer';
+import API from '../api.js'
 
 const SignIn = () => {
   const [email, setEmail] = useState('');
@@ -13,19 +14,35 @@ const SignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Sign in successful",
-        description: "Welcome back to Artify Ghibli!"
+  
+    try {
+      const response = await API.post('/auth/login', {
+        email,
+        password,
       });
-      navigate('/');
-    }, 1500);
+  
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+  
+        toast({
+          title: 'Sign in successful',
+          description: 'Welcome back to Artify Ghibli!',
+        });
+  
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Sign in failed',
+        description: error.response?.data?.message || 'Invalid credentials',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
