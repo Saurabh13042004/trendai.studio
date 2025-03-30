@@ -1,12 +1,20 @@
 const express = require('express');
-const { uploadImage, getGeneratedImages } = require('../controller/imageController');
+const {
+  uploadImage,
+  getGeneratedImages,
+  triggerImageGeneration,
+} = require('../controller/imageController');
 const authMiddleware = require('../middleware/authMiddleware');
-const multer = require('multer');
 
-const upload = multer({ dest: 'uploads/' });
 const router = express.Router();
 
-router.post('/upload', authMiddleware, upload.single('image'), uploadImage);
+// Upload an image in base64 format
+router.post('/upload', authMiddleware, uploadImage);
+
+// Get all generated images for the authenticated user
 router.get('/generated', authMiddleware, getGeneratedImages);
+
+// Trigger image generation
+router.post('/generate', authMiddleware, triggerImageGeneration);
 
 module.exports = router;

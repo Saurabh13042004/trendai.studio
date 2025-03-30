@@ -17,10 +17,10 @@ exports.registerUser = async (req, res) => {
 
     // Hash the password
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create and save the new user
-    const newUser = new User({ name, email, password: hashedPassword });
+    const newUser = new User({ name, email, password });
     await newUser.save();
 
     // Generate JWT token
@@ -57,7 +57,8 @@ exports.loginUser = async (req, res) => {
     }
 
     // Compare the provided password with the stored hash using bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = password === user.password; // For simplicity, using plain text comparison
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
