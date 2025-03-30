@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, UserIcon, KeyIcon } from 'lucide-react';
+import { Eye, EyeOff, UserIcon, KeyIcon, MailIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Footer from '@/components/Footer';
+import axios from 'axios';
 
-const SignIn = () => {
+const SignUp = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -13,19 +14,37 @@ const SignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Sign in successful",
-        description: "Welcome back to Artify Ghibli!"
+    try {
+      const response = await axios.post('/api/auth/register', {
+        name,
+        email,
+        password
       });
-      navigate('/');
-    }, 1500);
+      
+      if (response.data.success) {
+        // Store token in localStorage
+        localStorage.setItem('token', response.data.token);
+        
+        toast({
+          title: "Registration successful",
+          description: "Welcome to Artify Ghibli!"
+        });
+        
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.response?.data?.message || "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -49,18 +68,40 @@ const SignIn = () => {
                 </span>
               </h1>
             </Link>
-            <p className="mt-2 text-gray-600">Sign in to your account</p>
+            <p className="mt-2 text-gray-600">Create your account</p>
           </div>
           
           <div className="ghibli-card">
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <UserIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-ghibli-blue focus:border-ghibli-blue"
+                    placeholder="John Doe"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserIcon className="h-5 w-5 text-gray-400" />
+                    <MailIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     id="email"
@@ -88,12 +129,13 @@ const SignIn = () => {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-ghibli-blue focus:border-ghibli-blue"
                     placeholder="••••••••"
+                    minLength={6}
                   />
                   <button
                     type="button"
@@ -107,26 +149,7 @@ const SignIn = () => {
                     )}
                   </button>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 text-ghibli-blue focus:ring-ghibli-blue border-gray-300 rounded"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                    Remember me
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <a href="#" className="font-medium text-ghibli-blue hover:text-ghibli-blue/80">
-                    Forgot password?
-                  </a>
-                </div>
+                <p className="mt-1 text-xs text-gray-500">Password must be at least 6 characters long</p>
               </div>
 
               <div>
@@ -135,16 +158,16 @@ const SignIn = () => {
                   disabled={isLoading}
                   className="w-full ghibli-btn-primary"
                 >
-                  {isLoading ? 'Signing in...' : 'Sign in'}
+                  {isLoading ? 'Creating account...' : 'Sign up'}
                 </button>
               </div>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/sign-up" className="font-medium text-ghibli-blue hover:text-ghibli-blue/80">
-                  Sign up
+                Already have an account?{' '}
+                <Link to="/sign-in" className="font-medium text-ghibli-blue hover:text-ghibli-blue/80">
+                  Sign in
                 </Link>
               </p>
             </div>
@@ -157,4 +180,4 @@ const SignIn = () => {
   );
 };
 
-export default SignIn;
+export default SignUp;

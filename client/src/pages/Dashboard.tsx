@@ -14,7 +14,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   // Simulate authentication check 
-  const isAuthenticated = localStorage.getItem('authenticated') === 'true';
+  const isAuthenticated = true;
   
   useEffect(() => {
     if (!isAuthenticated) {

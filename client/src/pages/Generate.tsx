@@ -21,7 +21,7 @@ const Generate = () => {
   const { toast } = useToast();
   
   // Simulate authentication check
-  const isAuthenticated = localStorage.getItem('authenticated') === 'true';
+  const isAuthenticated = true;
   
   React.useEffect(() => {
     if (!isAuthenticated) {
