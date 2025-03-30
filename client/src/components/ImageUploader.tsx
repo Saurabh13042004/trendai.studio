@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import axios from 'axios';
+import API from '@/api'; // Import the API client
 
 const ImageUploader = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -16,7 +17,7 @@ const ImageUploader = () => {
   const navigate = useNavigate();
 
   // Simulate authentication check (replace with your actual auth check)
-  const isAuthenticated = localStorage.getItem('authenticated') === 'true';
+  const isAuthenticated = !!localStorage.getItem('token');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -26,11 +27,7 @@ const ImageUploader = () => {
 
   const fetchGeneratedImages = async () => {
     try {
-      const response = await axios.get('/api/images/generated', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await API.get('/images/generated');
       setGeneratedImages(response.data.generatedImages.map((img: { url: string }) => img.url));
     } catch (error) {
       console.error('Error fetching generated images:', error);
@@ -128,25 +125,15 @@ const ImageUploader = () => {
 
   const uploadImage = async () => {
     if (!selectedImage) return;
-
+    setIsConverting(true);
+    
     try {
-      const response = await axios.post(
-        '/api/images/upload',
-        { image: selectedImage },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-
+      const response = await API.post('/images/upload', { image: selectedImage });
       setConvertedImage(response.data.generatedImageUrl);
       toast({
         title: 'Upload successful!',
         description: 'Your image has been uploaded and transformed.',
       });
-
-      // Refresh the list of generated images
       fetchGeneratedImages();
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -155,21 +142,14 @@ const ImageUploader = () => {
         description: 'Failed to upload and transform the image.',
         variant: 'destructive',
       });
+    } finally {
+      setIsConverting(false);
     }
   };
 
   const triggerImageGeneration = async () => {
     try {
-      await axios.post(
-        '/api/images/generate',
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-
+      await API.post('/images/generate');
       toast({
         title: 'Image generation triggered!',
         description: 'Your image generation request has been submitted.',

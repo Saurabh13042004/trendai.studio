@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
 import { Image, Download, Plus } from 'lucide-react';
+import API from '@/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -13,11 +13,9 @@ const Dashboard = () => {
   const [creations, setCreations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Simulate authentication check 
-  const isAuthenticated = true;
-  
   useEffect(() => {
-    if (!isAuthenticated) {
+    const token = localStorage.getItem('token');
+    if (!token) {
       toast({
         title: "Authentication required",
         description: "Please sign in to view your dashboard",
@@ -26,18 +24,35 @@ const Dashboard = () => {
       return;
     }
     
-    // Simulate fetching user creations
-    // In a real app, this would be an API call to get the user's creations
-    setTimeout(() => {
-      const mockCreations = [
-        { id: 1, name: 'Mountain Landscape', date: '2023-06-12', imageUrl: 'https://images.unsplash.com/photo-1613563696485-f5655a595bbb' },
-        { id: 2, name: 'Forest Spirit', date: '2023-06-14', imageUrl: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4' },
-        { id: 3, name: 'Ocean Journey', date: '2023-06-20', imageUrl: 'https://images.unsplash.com/photo-1587271407850-8d438ca9fdf2' },
-      ];
-      setCreations(mockCreations);
-      setIsLoading(false);
-    }, 1000);
-  }, [navigate, toast, isAuthenticated]);
+    // Fetch user's creations from API
+    const fetchUserCreations = async () => {
+      setIsLoading(true);
+      try {
+        const response = await API.get('/images/generated');
+        
+        // Transform the data to match the component's expected format
+        const userCreations = response.data.generatedImages.map((img, index) => ({
+          id: index + 1,
+          name: `Creation ${index + 1}`,
+          date: new Date(img.createdAt || Date.now()).toISOString().split('T')[0],
+          imageUrl: img.url
+        }));
+        
+        setCreations(userCreations);
+      } catch (error) {
+        console.error('Error fetching user creations:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load your creations',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUserCreations();
+  }, [navigate, toast]);
 
   const handleCreateNew = () => {
     navigate('/generate');
