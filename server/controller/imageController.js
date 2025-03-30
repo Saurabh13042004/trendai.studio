@@ -1,12 +1,18 @@
 const User = require('../models/User');
+const Image = require('../models/Image');
 const nodemailer = require('nodemailer');
 
 exports.uploadImage = async (req, res) => {
   const userId = req.user.id; // from auth middleware
 
   try {
-    // Check user's plan and limit image generation accordingly
+    // Check if the user exists
     const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Check if the user has an active plan
     if (!user.plan) {
       return res.status(403).json({ message: 'Please purchase a plan to generate images.' });
     }
@@ -16,44 +22,63 @@ exports.uploadImage = async (req, res) => {
       return res.status(403).json({ message: 'Image generation quota exceeded for your plan.' });
     }
 
-    // Store the uploaded image in base64 format
-    const base64Image = req.body.image; // Assuming the image is sent as a base64 string in the request body
+    // Validate the presence of the image in the request body
+    const base64Image = req.body.image;
     if (!base64Image) {
       return res.status(400).json({ message: 'Image is required in base64 format.' });
     }
 
-    const generatedImageUrl = `data:image/png;base64,${base64Image}`; // Simulated generated image
+    // Create a new image record in the database
+    const newImage = new Image({
+      user: userId,
+      name: req.body.name || 'Uploaded Image',
+      prompt: req.body.prompt || '',
+      originalImageUrl: base64Image,
+      status: 'processing',
+    });
 
-    // Save the generated image URL to the user's record
-    user.generatedImages.push({ url: generatedImageUrl });
-    user.subscription.imagesRemaining -= 1; // Decrease the remaining quota
+    await newImage.save();
+
+    // Decrease the user's remaining quota
+    user.subscription.imagesRemaining -= 1;
     await user.save();
 
-    // Send email notification (configure nodemailer)
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+    // Simulate image generation (replace this with actual image processing logic)
+    setTimeout(async () => {
+      newImage.generatedImageUrl = `data:image/png;base64,${base64Image}`; // Simulated generated image
+      newImage.status = 'completed';
+      newImage.completedAt = new Date();
+      await newImage.save();
+
+      // Send email notification (configure nodemailer)
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: 'Your Ghibli Image is Ready!',
+        text: 'Your generated image is ready. Please check your account.',
+      };
+
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+          console.error('Error sending email:', err);
+        } else {
+          console.log('Email sent:', info.response);
+        }
+      });
+    }, 5000); // Simulate a delay of 5 seconds for image generation
+
+    res.status(200).json({
+      message: 'Image uploaded successfully! Processing has started.',
+      imageId: newImage._id,
     });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: 'Your Ghibli Image is Ready!',
-      text: 'Your generated image is ready. Please check your account.',
-    };
-
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.error('Error sending email:', err);
-      } else {
-        console.log('Email sent:', info.response);
-      }
-    });
-
-    res.status(200).json({ message: 'Image generated successfully!', generatedImageUrl });
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({ message: 'Error uploading image', error: error.message });
@@ -64,12 +89,10 @@ exports.getGeneratedImages = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
+    // Fetch all images for the authenticated user
+    const images = await Image.find({ user: userId }).sort({ createdAt: -1 });
 
-    res.status(200).json({ generatedImages: user.generatedImages });
+    res.status(200).json({ generatedImages: images });
   } catch (error) {
     console.error('Error retrieving generated images:', error);
     res.status(500).json({ message: 'Error retrieving generated images', error: error.message });
