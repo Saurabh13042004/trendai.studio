@@ -43,42 +43,47 @@ exports.uploadImage = async (req, res) => {
     user.subscription.imagesRemaining -= 1;
     await user.save();
 
-    // Simulate image generation (replace this with actual image processing logic)
-    setTimeout(async () => {
-      newImage.generatedImageUrl = `data:image/png;base64,${base64Image}`; // Simulated generated image
-      newImage.status = 'completed';
-      newImage.completedAt = new Date();
-      await newImage.save();
-
-      // Send email notification (configure nodemailer)
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: 'Your Ghibli Image is Ready!',
-        text: 'Your generated image is ready. Please check your account.',
-      };
-
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-          console.error('Error sending email:', err);
-        } else {
-          console.log('Email sent:', info.response);
-        }
-      });
-    }, 5000); // Simulate a delay of 5 seconds for image generation
-
+    // Send the response immediately
     res.status(200).json({
       message: 'Image uploaded successfully! Processing has started.',
       imageId: newImage._id,
     });
+
+    // Simulate image generation (replace this with actual image processing logic)
+    setTimeout(async () => {
+      try {
+        newImage.generatedImageUrl = `data:image/png;base64,${base64Image}`; // Simulated generated image
+        newImage.status = 'completed';
+        newImage.completedAt = new Date();
+        await newImage.save();
+
+        // Send email notification (configure nodemailer)
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: user.email,
+          subject: 'Your Ghibli Image is Ready!',
+          text: 'Your generated image is ready. Please check your account.',
+        };
+
+        transporter.sendMail(mailOptions, (err, info) => {
+          if (err) {
+            console.error('Error sending email:', err);
+          } else {
+            console.log('Email sent:', info.response);
+          }
+        });
+      } catch (error) {
+        console.error('Error during image generation:', error);
+      }
+    }, 5000); // Simulate a delay of 5 seconds for image generation
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({ message: 'Error uploading image', error: error.message });
