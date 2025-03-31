@@ -4,18 +4,24 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
-import { Image, Download, Plus } from 'lucide-react';
-import API from '@/api';
+import { Image, Download, Plus, ShoppingCart } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
+import CartIcon from '@/components/CartIcon';
+import Pricing from '@/components/Pricing';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { addItem } = useCart();
   const [creations, setCreations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userTokens, setUserTokens] = useState(0);
+  
+  // Simulate authentication check 
+  const isAuthenticated = localStorage.getItem('authenticated') === 'true';
   
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    if (!isAuthenticated) {
       toast({
         title: "Authentication required",
         description: "Please sign in to view your dashboard",
@@ -24,38 +30,35 @@ const Dashboard = () => {
       return;
     }
     
-    // Fetch user's creations from API
-    const fetchUserCreations = async () => {
-      setIsLoading(true);
-      try {
-        const response = await API.get('/images/generated');
-        
-        // Transform the data to match the component's expected format
-        const userCreations = response.data.generatedImages.map((img, index) => ({
-          id: index + 1,
-          name: `Creation ${index + 1}`,
-          date: new Date(img.createdAt || Date.now()).toISOString().split('T')[0],
-          imageUrl: img.url
-        }));
-        
-        setCreations(userCreations);
-      } catch (error) {
-        console.error('Error fetching user creations:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load your creations',
-          variant: 'destructive'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchUserCreations();
-  }, [navigate, toast]);
+    // Simulate fetching user creations
+    // In a real app, this would be an API call to get the user's creations
+    setTimeout(() => {
+      const mockCreations = [
+        { id: 1, name: 'Mountain Landscape', date: '2023-06-12', imageUrl: 'https://images.unsplash.com/photo-1613563696485-f5655a595bbb', price: 15.99 },
+        { id: 2, name: 'Forest Spirit', date: '2023-06-14', imageUrl: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4', price: 19.99 },
+        { id: 3, name: 'Ocean Journey', date: '2023-06-20', imageUrl: 'https://images.unsplash.com/photo-1587271407850-8d438ca9fdf2', price: 12.99 },
+      ];
+      setCreations(mockCreations);
+      setIsLoading(false);
+      
+      // For demo purposes, set user tokens to 0 to show pricing section
+      // In a real app, this would come from the user's account data
+      setUserTokens(0);
+    }, 1000);
+  }, [navigate, toast, isAuthenticated]);
 
   const handleCreateNew = () => {
-    navigate('/generate');
+    if (userTokens <= 0) {
+      toast({
+        title: "No tokens available",
+        description: "Please purchase a plan to create new images.",
+      });
+      // Scroll to pricing section
+      const pricingSection = document.getElementById('dashboard-pricing');
+      pricingSection?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate('/generate');
+    }
   };
 
   const handleDownload = (imageUrl: string, name: string) => {
@@ -63,6 +66,21 @@ const Dashboard = () => {
     toast({
       title: "Download started",
       description: `Downloading ${name}...`,
+    });
+  };
+
+  const handleAddToCart = (creation: any) => {
+    addItem({
+      id: creation.id,
+      name: creation.name,
+      price: creation.price,
+      imageUrl: creation.imageUrl,
+      quantity: 1,
+    });
+    
+    toast({
+      title: "Added to cart",
+      description: `${creation.name} has been added to your cart.`,
     });
   };
 
@@ -81,11 +99,25 @@ const Dashboard = () => {
     <div className="container mx-auto px-4 py-16">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl md:text-3xl font-bold">Your Magical Creations</h1>
-        <Button onClick={handleCreateNew} className="bg-ghibli-blue hover:bg-ghibli-blue/80">
-          <Plus className="mr-2" size={18} />
-          Create New
-        </Button>
+        <div className="flex items-center space-x-2">
+          <CartIcon />
+          <Button onClick={handleCreateNew} className="bg-ghibli-blue hover:bg-ghibli-blue/80">
+            <Plus className="mr-2" size={18} />
+            Create New
+          </Button>
+        </div>
       </div>
+
+      {userTokens <= 0 && (
+        <Card className="mb-8 border-ghibli-pink border-2">
+          <CardHeader>
+            <CardTitle>You need tokens to create magical images</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">You currently have 0 tokens available. Purchase a plan to create beautiful Ghibli-style images.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {creations.length === 0 ? (
         <Card className="text-center p-8">
@@ -112,15 +144,26 @@ const Dashboard = () => {
                 <CardTitle className="text-lg">{creation.name}</CardTitle>
               </CardHeader>
               <CardFooter className="p-4 pt-0 flex justify-between">
-                <span className="text-sm text-gray-500">{creation.date}</span>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleDownload(creation.imageUrl, creation.name)}
-                >
-                  <Download size={16} className="mr-2" />
-                  Download
-                </Button>
+                <span className="text-sm text-gray-500">${creation.price.toFixed(2)}</span>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDownload(creation.imageUrl, creation.name)}
+                  >
+                    <Download size={16} className="mr-2" />
+                    Download
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={() => handleAddToCart(creation)}
+                    className="bg-ghibli-green hover:bg-ghibli-green/80"
+                  >
+                    <ShoppingCart size={16} className="mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
               </CardFooter>
             </Card>
           ))}
@@ -135,6 +178,7 @@ const Dashboard = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -143,14 +187,25 @@ const Dashboard = () => {
                 <TableRow key={creation.id}>
                   <TableCell className="font-medium">{creation.name}</TableCell>
                   <TableCell>{creation.date}</TableCell>
+                  <TableCell>${creation.price.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDownload(creation.imageUrl, creation.name)}
-                    >
-                      <Download size={16} />
-                    </Button>
+                    <div className="flex justify-end space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownload(creation.imageUrl, creation.name)}
+                      >
+                        <Download size={16} />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleAddToCart(creation)}
+                        className="text-ghibli-green"
+                      >
+                        <ShoppingCart size={16} />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -158,6 +213,13 @@ const Dashboard = () => {
           </Table>
         </Card>
       </div>
+
+      {userTokens <= 0 && (
+        <div id="dashboard-pricing" className="mt-16">
+          <h2 className="text-2xl font-bold mb-6">Get More Tokens</h2>
+          <Pricing />
+        </div>
+      )}
     </div>
   );
 };

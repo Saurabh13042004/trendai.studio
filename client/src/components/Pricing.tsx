@@ -1,12 +1,20 @@
 
 import React from 'react';
 import { Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
+import { useToast } from '@/hooks/use-toast';
 
 const Pricing = () => {
+  const navigate = useNavigate();
+  const { addItem } = useCart();
+  const { toast } = useToast();
+
   const plans = [
     {
+      id: 101,
       name: "Starter",
-      price: "₹50",
+      price: 50,
       features: [
         "2 Image transformations",
         "High-quality output",
@@ -14,11 +22,13 @@ const Pricing = () => {
         "Valid for 7 days"
       ],
       buttonText: "Get Started",
-      popular: false
+      popular: false,
+      imageUrl: "/placeholder.svg"
     },
     {
+      id: 102,
       name: "Standard",
-      price: "₹100",
+      price: 100,
       features: [
         "5 Image transformations",
         "High-quality output",
@@ -27,9 +37,28 @@ const Pricing = () => {
         "Valid for 30 days"
       ],
       buttonText: "Best Value",
-      popular: true
+      popular: true,
+      imageUrl: "/placeholder.svg"
     }
   ];
+
+  const handleAddToCart = (plan) => {
+    addItem({
+      id: plan.id,
+      name: `${plan.name} Plan`,
+      price: plan.price,
+      imageUrl: plan.imageUrl,
+      quantity: 1,
+    });
+    
+    toast({
+      title: "Added to cart",
+      description: `${plan.name} Plan has been added to your cart.`,
+    });
+    
+    // Navigate to cart page
+    navigate('/cart');
+  };
 
   return (
     <section id="pricing" className="py-16 bg-ghibli-clouds bg-contain bg-no-repeat bg-top">
@@ -57,7 +86,7 @@ const Pricing = () => {
               <div className="p-6">
                 <h3 className="text-2xl font-bold mb-2 text-gray-800">{plan.name}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-4xl font-bold">₹{plan.price}</span>
                 </div>
                 <ul className="mb-6 space-y-2">
                   {plan.features.map((feature, idx) => (
@@ -67,7 +96,10 @@ const Pricing = () => {
                     </li>
                   ))}
                 </ul>
-                <button className={`w-full ${plan.popular ? 'ghibli-btn-primary' : 'ghibli-btn-secondary'}`}>
+                <button 
+                  className={`w-full ${plan.popular ? 'ghibli-btn-primary' : 'ghibli-btn-secondary'}`}
+                  onClick={() => handleAddToCart(plan)}
+                >
                   {plan.buttonText}
                 </button>
               </div>
