@@ -1,23 +1,20 @@
 const express = require('express');
+const {
+  uploadImage,
+  getGeneratedImages,
+  triggerImageGeneration,
+} = require('../controller/imageController');
+const authMiddleware = require('../middleware/authMiddleware');
+
 const router = express.Router();
-const imageController = require('../controller/imageController');
-const { protect } = require('../middleware/auth');
-const { imageLimiter } = require('../middleware/limiter');
-const upload = require('../middleware/upload');
 
-// All routes are protected
-router.use(protect);
+// Upload an image in base64 format
+router.post('/upload', authMiddleware, uploadImage);
 
-// Apply rate limiting to image generation
-router.post('/generate', imageLimiter, upload.single('image'), imageController.generateImage);
+// Get all generated images for the authenticated user
+router.get('/generated', authMiddleware, getGeneratedImages);
 
-// Get user's images
-router.get('/', imageController.getUserImages);
-
-// Get single image
-router.get('/:id', imageController.getImage);
-
-// Delete image
-router.delete('/:id', imageController.deleteImage);
+// Trigger image generation
+router.post('/generate', authMiddleware, triggerImageGeneration);
 
 module.exports = router;

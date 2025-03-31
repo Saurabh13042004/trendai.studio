@@ -4,6 +4,7 @@ import { Eye, EyeOff, UserIcon, KeyIcon, MailIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Footer from '@/components/Footer';
 import axios from 'axios';
+import API from '../api.js'
 
 const SignUp = () => {
   const [name, setName] = useState('');
@@ -17,30 +18,29 @@ const SignUp = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      const response = await axios.post('/api/auth/register', {
+      const response = await API.post('/auth/register', {
         name,
         email,
-        password
+        password,
       });
-      
-      if (response.data.success) {
-        // Store token in localStorage
+
+      if (response.data.token){
         localStorage.setItem('token', response.data.token);
-        
+
         toast({
-          title: "Registration successful",
-          description: "Welcome to Artify Ghibli!"
+          title: 'Registration successful',
+          description: 'Welcome to Artify Ghibli!',
         });
-        
+
         navigate('/dashboard');
       }
     } catch (error: any) {
       toast({
-        title: "Registration failed",
-        description: error.response?.data?.message || "Something went wrong",
-        variant: "destructive"
+        title: 'Registration failed',
+        description: error.response?.data?.message || 'Something went wrong',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -50,8 +50,8 @@ const SignUp = () => {
   return (
     <div className="min-h-screen flex flex-col relative bg-ghibli-cream">
       {/* Background decorative elements */}
-      <div 
-        className="absolute inset-0 z-0 opacity-30 pointer-events-none" 
+      <div
+        className="absolute inset-0 z-0 opacity-30 pointer-events-none"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a8d8ea' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}
@@ -70,7 +70,7 @@ const SignUp = () => {
             </Link>
             <p className="mt-2 text-gray-600">Create your account</p>
           </div>
-          
+
           <div className="ghibli-card">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
@@ -174,7 +174,7 @@ const SignUp = () => {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

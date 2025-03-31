@@ -1,242 +1,126 @@
-const Image = require('../models/Image');
 const User = require('../models/User');
-const imageService = require('../services/imageService');
-const emailService = require('../services/emailService');
-const { s3 } = require('../config/storage');
+const Image = require('../models/Image');
+const nodemailer = require('nodemailer');
 
-// @desc    Upload and generate Ghibli-style image
-// @route   POST /api/images/generate
-// @access  Private
-exports.generateImage = async (req, res) => {
+exports.uploadImage = async (req, res) => {
+  const userId = req.user.id; // from auth middleware
+
   try {
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please upload an image'
-      });
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
     }
 
-    const { prompt = '' } = req.body;
-    const imageName = req.body.name || `Ghibli Art ${Date.now()}`;
-    
-    // Get user to check subscription
-    const user = await User.findById(req.user.id);
-    
-    // Ensure user has images remaining in their subscription
-    if (user.subscription.imagesRemaining <= 0) {
-      return res.status(403).json({
-        success: false,
-        message: 'You have used all your image generations. Please upgrade your plan.',
-        requiresSubscription: true
-      });
+    // Check if the user has an active plan
+    if (!user.plan) {
+      return res.status(403).json({ message: 'Please purchase a plan to generate images.' });
     }
-    
-    // Decrement images remaining count
-    user.subscription.imagesRemaining--;
-    await user.save();
-    
-    // Create a new image record
-    const newImage = await Image.create({
-      user: req.user.id,
-      name: imageName,
-      prompt,
-      originalImageUrl: req.file.location,
+
+    // Check if the user has remaining image generation quota
+    if (user.subscription.imagesRemaining <= 0) {
+      return res.status(403).json({ message: 'Image generation quota exceeded for your plan.' });
+    }
+
+    // Validate the presence of the image in the request body
+    const base64Image = req.body.image;
+    if (!base64Image) {
+      return res.status(400).json({ message: 'Image is required in base64 format.' });
+    }
+
+    // Create a new image record in the database
+    const newImage = new Image({
+      user: userId,
+      name: req.body.name || 'Uploaded Image',
+      prompt: req.body.prompt || '',
+      originalImageUrl: base64Image,
       status: 'processing',
     });
-    
-    // Respond immediately to client with the queued status
-    res.status(202).json({
-      success: true,
-      message: 'Image processing started. You will receive an email when it is ready.',
-      data: {
-        id: newImage._id,
-        name: newImage.name,
-        status: newImage.status,
-        originalImageUrl: newImage.originalImageUrl,
-        createdAt: newImage.createdAt
+
+    await newImage.save();
+
+    // Decrease the user's remaining quota
+    user.subscription.imagesRemaining -= 1;
+    await user.save();
+
+    // Send the response immediately
+    res.status(200).json({
+      message: 'Image uploaded successfully! Processing has started.',
+      imageId: newImage._id,
+    });
+
+    // Simulate image generation (replace this with actual image processing logic)
+    setTimeout(async () => {
+      try {
+        newImage.generatedImageUrl = `data:image/png;base64,${base64Image}`; // Simulated generated image
+        newImage.status = 'completed';
+        newImage.completedAt = new Date();
+        await newImage.save();
+
+        // Send email notification (configure nodemailer)
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: user.email,
+          subject: 'Your Ghibli Image is Ready!',
+          text: 'Your generated image is ready. Please check your account.',
+        };
+
+        transporter.sendMail(mailOptions, (err, info) => {
+          if (err) {
+            console.error('Error sending email:', err);
+          } else {
+            console.log('Email sent:', info.response);
+          }
+        });
+      } catch (error) {
+        console.error('Error during image generation:', error);
       }
-    });
-    
-    // Process image asynchronously (in a real app this would likely be a message queue)
-    try {
-      // Queue the image processing job
-      // For demonstration purposes, we'll use setTimeout to simulate processing delay
-      // In a real app, you'd use a job queue like Bull or a serverless function
-      setTimeout(async () => {
-        try {
-          // Process the image (this is where your AI model would be called)
-          const generatedImageUrl = await imageService.processImage(
-            newImage.originalImageUrl,
-            prompt
-          );
-          
-          // Update the image status and URL in the database
-          newImage.status = 'completed';
-          newImage.generatedImageUrl = generatedImageUrl;
-          newImage.completedAt = new Date();
-          await newImage.save();
-          
-          // Send email notification
-          await emailService.sendImageGenerationCompleted(
-            user.email,
-            user.name,
-            newImage.name,
-            generatedImageUrl
-          );
-        } catch (processError) {
-          // Handle processing failure
-          newImage.status = 'failed';
-          await newImage.save();
-          
-          // Refund the image credit to the user
-          user.subscription.imagesRemaining++;
-          await user.save();
-          
-          // Send failure notification
-          await emailService.sendImageGenerationFailed(
-            user.email,
-            user.name,
-            newImage.name
-          );
-          
-          console.error('Image processing failed:', processError);
-        }
-      }, 15 * 60 * 1000); // 15 minutes delay to simulate processing time
-    } catch (queueError) {
-      console.error('Failed to queue image processing job:', queueError);
-    }
+    }, 5000); // Simulate a delay of 5 seconds for image generation
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process image generation request',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
+    console.error('Error uploading image:', error);
+    res.status(500).json({ message: 'Error uploading image', error: error.message });
   }
 };
 
-// @desc    Get all images for the logged-in user
-// @route   GET /api/images
-// @access  Private
-exports.getUserImages = async (req, res) => {
+exports.getGeneratedImages = async (req, res) => {
+  const userId = req.user.id;
+
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const startIndex = (page - 1) * limit;
-    
-    const images = await Image.find({ user: req.user.id })
-      .sort({ createdAt: -1 })
-      .skip(startIndex)
-      .limit(limit);
-    
-    const totalImages = await Image.countDocuments({ user: req.user.id });
-    
-    res.status(200).json({
-      success: true,
-      count: images.length,
-      pagination: {
-        page,
-        limit,
-        totalPages: Math.ceil(totalImages / limit),
-        total: totalImages
-      },
-      data: images
-    });
+    // Fetch all images for the authenticated user
+    const images = await Image.find({ user: userId }).sort({ createdAt: -1 });
+
+    res.status(200).json({ generatedImages: images });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve images',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
+    console.error('Error retrieving generated images:', error);
+    res.status(500).json({ message: 'Error retrieving generated images', error: error.message });
   }
 };
 
-// @desc    Get a single image by ID
-// @route   GET /api/images/:id
-// @access  Private
-exports.getImage = async (req, res) => {
-  try {
-    const image = await Image.findById(req.params.id);
-    
-    if (!image) {
-      return res.status(404).json({
-        success: false,
-        message: 'Image not found'
-      });
-    }
-    
-    // Check if the image belongs to the logged-in user
-    if (image.user.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this image'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: image
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve image',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
+exports.triggerImageGeneration = async (req, res) => {
+  const userId = req.user.id;
 
-// @desc    Delete an image
-// @route   DELETE /api/images/:id
-// @access  Private
-exports.deleteImage = async (req, res) => {
   try {
-    const image = await Image.findById(req.params.id);
-    
-    if (!image) {
-      return res.status(404).json({
-        success: false,
-        message: 'Image not found'
-      });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
     }
-    
-    // Check if the image belongs to the logged-in user
-    if (image.user.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this image'
-      });
+
+    if (!user.plan) {
+      return res.status(403).json({ message: 'Please purchase a plan to generate images.' });
     }
-    
-    // Delete image files from S3
-    if (image.originalImageUrl) {
-      const originalKey = new URL(image.originalImageUrl).pathname.slice(1);
-      await s3.deleteObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: originalKey
-      });
-    }
-    
-    if (image.generatedImageUrl) {
-      const generatedKey = new URL(image.generatedImageUrl).pathname.slice(1);
-      await s3.deleteObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: generatedKey
-      });
-    }
-    
-    // Delete image from database
-    await image.remove();
-    
-    res.status(200).json({
-      success: true,
-      message: 'Image deleted successfully'
-    });
+
+    // Simulate triggering image generation
+    res.status(200).json({ message: 'Image generation triggered successfully!' });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete image',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
+    console.error('Error triggering image generation:', error);
+    res.status(500).json({ message: 'Error triggering image generation', error: error.message });
   }
 };

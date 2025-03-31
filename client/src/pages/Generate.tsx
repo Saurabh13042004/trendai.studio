@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Image as ImageIcon, Loader, Download } from 'lucide-react';
+import axios from 'axios';
 
 const Generate = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -19,10 +19,10 @@ const Generate = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   // Simulate authentication check
-  const isAuthenticated = true;
-  
+  const isAuthenticated = !!localStorage.getItem('token');
+
   React.useEffect(() => {
     if (!isAuthenticated) {
       toast({
@@ -44,7 +44,7 @@ const Generate = () => {
         });
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -59,7 +59,7 @@ const Generate = () => {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (!file.type.includes('image/')) {
@@ -70,7 +70,7 @@ const Generate = () => {
         });
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -95,7 +95,7 @@ const Generate = () => {
     fileInputRef.current?.click();
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedImage) {
       toast({
         title: "No image selected",
@@ -107,46 +107,85 @@ const Generate = () => {
 
     setIsGenerating(true);
     setProgressValue(0);
-    
-    // Simulate generation progress
-    const interval = setInterval(() => {
-      setProgressValue((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+
+    try {
+      // Upload the image to the backend
+      const uploadResponse = await axios.post(
+        'images/upload',
+        { image: selectedImage },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
         }
-        return prev + 5;
-      });
-    }, 300);
-    
-    // Simulate image generation with a timeout
-    // In a real app, this would be an API call to your backend
-    setTimeout(() => {
-      clearInterval(interval);
-      setProgressValue(100);
-      
-      // Just using the same image for demo purposes
-      setGeneratedImage(selectedImage);
-      setIsGenerating(false);
-      
+      );
+
+      setGeneratedImage(uploadResponse.data.generatedImageUrl);
+
       toast({
-        title: "Generation complete!",
-        description: "Your Ghibli-style image has been created.",
+        title: "Image uploaded successfully!",
+        description: "Your image has been uploaded and transformed.",
       });
-    }, 6000);
+
+      // Trigger image generation
+      await axios.post(
+        '/images/generate',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      toast({
+        title: "Image generation triggered!",
+        description: "Your image generation request has been submitted.",
+      });
+
+      // Simulate generation progress
+      const interval = setInterval(() => {
+        setProgressValue((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          return prev + 5;
+        });
+      }, 300);
+
+      // Simulate image generation completion
+      setTimeout(() => {
+        clearInterval(interval);
+        setProgressValue(100);
+        setIsGenerating(false);
+
+        toast({
+          title: "Generation complete!",
+          description: "Your Ghibli-style image has been created.",
+        });
+      }, 6000);
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate the image.",
+        variant: "destructive"
+      });
+      setIsGenerating(false);
+    }
   };
 
   const handleDownload = () => {
     if (!generatedImage) return;
-    
-    // Create a temporary anchor element
+
     const link = document.createElement('a');
     link.href = generatedImage;
     link.download = `ghibli-art-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     toast({
       title: "Image downloaded",
       description: "Your artwork has been saved to your device.",
@@ -160,28 +199,28 @@ const Generate = () => {
   return (
     <div className="container mx-auto px-4 py-16">
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-8">Transform Your Image</h1>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
         <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle>Upload Reference Image</CardTitle>
           </CardHeader>
           <CardContent>
-            <div 
+            <div
               className={`relative border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center h-64 transition-colors ${isDragging ? 'border-ghibli-green bg-ghibli-green/10' : 'border-gray-300 hover:border-ghibli-blue'} ${selectedImage ? 'bg-gray-50' : ''}`}
               onClick={handleUploadClick}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
             >
-              <input 
-                type="file" 
-                className="hidden" 
+              <input
+                type="file"
+                className="hidden"
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 accept="image/*"
               />
-              
+
               {!selectedImage ? (
                 <div className="text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -191,9 +230,9 @@ const Generate = () => {
               ) : (
                 <div className="text-center w-full">
                   <div className="relative w-full h-48 mb-2">
-                    <img 
-                      src={selectedImage} 
-                      alt="Preview" 
+                    <img
+                      src={selectedImage}
+                      alt="Preview"
                       className="h-full mx-auto object-contain"
                     />
                   </div>
@@ -201,7 +240,7 @@ const Generate = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="mt-6">
               <Label htmlFor="prompt" className="block mb-2">Styling Prompt (optional)</Label>
               <Input
@@ -214,7 +253,7 @@ const Generate = () => {
             </div>
           </CardContent>
           <CardFooter>
-            <Button 
+            <Button
               className="w-full bg-ghibli-blue hover:bg-ghibli-blue/80"
               onClick={handleGenerate}
               disabled={!selectedImage || isGenerating}
@@ -230,7 +269,7 @@ const Generate = () => {
             </Button>
           </CardFooter>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Generated Artwork</CardTitle>
@@ -246,9 +285,9 @@ const Generate = () => {
               </div>
             ) : generatedImage ? (
               <div className="relative w-full h-64 bg-gray-50 rounded-lg overflow-hidden">
-                <img 
-                  src={generatedImage} 
-                  alt="Generated Ghibli Art" 
+                <img
+                  src={generatedImage}
+                  alt="Generated Ghibli Art"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -261,7 +300,7 @@ const Generate = () => {
             )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
-            <Button 
+            <Button
               className="w-full"
               onClick={handleDownload}
               disabled={!generatedImage}
@@ -269,8 +308,8 @@ const Generate = () => {
               <Download className="mr-2 h-4 w-4" />
               Download Artwork
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={handleViewGallery}
             >

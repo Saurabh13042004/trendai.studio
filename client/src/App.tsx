@@ -10,11 +10,14 @@ import Dashboard from "./pages/Dashboard";
 import Generate from "./pages/Generate";
 import NotFound from "./pages/NotFound";
 import SignUp from "./pages/SignUp";
+import { AuthProvider } from './contexts/AuthContext';
+
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+      <AuthProvider>
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -30,6 +33,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
